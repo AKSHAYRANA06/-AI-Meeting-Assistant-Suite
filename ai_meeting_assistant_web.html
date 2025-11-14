@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Meeting Assistant</title>
+    <!-- 1. Load Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 2. Load Inter font -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar for text areas */
+        textarea::-webkit-scrollbar {
+            width: 8px;
+        }
+        textarea::-webkit-scrollbar-track {
+            background: #1f2937; /* dark blue-gray */
+        }
+        textarea::-webkit-scrollbar-thumb {
+            background: #4b5563; /* medium gray */
+            border-radius: 4px;
+        }
+        textarea::-webkit-scrollbar-thumb:hover {
+            background: #6b7280; /* light gray */
+        }
+        /* Custom modal styles */
+        .modal {
+            transition: opacity 0.25s ease;
+        }
+        .modal-content {
+            transition: transform 0.25s ease;
+        }
+        /* Rainbow Gradient for Title */
+        .gradient-text {
+            background-image: linear-gradient(45deg, #FF6B6B, #FFD166, #06D6A0, #118AB2, #6A4C93);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 flex items-center justify-center min-h-screen p-4">
+
+    <!-- Main Application Container -->
+    <div class="bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-4xl space-y-6 ring-2 ring-indigo-500 ring-opacity-20">
+
+        <!-- Header -->
+        <div class="text-center">
+            <!-- Updated: Added gradient and increased font size/weight -->
+            <h1 class="text-4xl font-extrabold gradient-text">AI Meeting Assistant</h1>
+            <!-- Updated: Changed to a bright yellow/orange for better contrast -->
+            <p id="status-label" class="text-yellow-400 mt-2 text-lg font-medium">Status: Idle</p>
+        </div>
+
+        <!-- Text Input Area -->
+        <div>
+            <label for="text-box" class="block text-sm font-medium text-gray-300 mb-2">Meeting Text / Voice Notes:</label>
+            <textarea id="text-box" rows="12" class="w-full p-4 bg-gray-900 border border-gray-700 rounded-xl shadow-inner text-gray-100 focus:ring-4 focus:ring-pink-500 focus:outline-none transition duration-150" placeholder="Start recording or type your meeting notes here..."></textarea>
+        </div>
+
+        <!-- Button Controls -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <!-- Updated Button Colors and Shadows for punchier look -->
+            <button id="start-btn" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-green-900/50 transition duration-200 ease-in-out transform hover:scale-[1.02]">
+                Start Recording
+            </button>
+            <button id="stop-btn" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-red-900/50 transition duration-200 ease-in-out transform hover:scale-[1.02] opacity-50" disabled>
+                Stop Recording
+            </button>
+            <button id="summarize-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-blue-900/50 transition duration-200 ease-in-out transform hover:scale-[1.02]">
+                Summarize Text
+            </button>
+            <button id="save-btn" class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-purple-900/50 transition duration-200 ease-in-out transform hover:scale-[1.02]">
+                Save Notes
+            </button>
+        </div>
+
+        <!-- Summary Output Area -->
+        <div>
+            <label for="summary-box" class="block text-sm font-medium text-gray-300 mb-2">Summary:</label>
+            <textarea id="summary-box" rows="8" class="w-full p-4 bg-gray-900 border border-gray-700 rounded-xl shadow-inner text-gray-100 focus:ring-4 focus:ring-pink-500 focus:outline-none transition duration-150" readonly placeholder="Your summary will appear here..."></textarea>
+        </div>
+    </div>
+
+    <!-- Custom Modal for Errors (replaces alert()) -->
+    <div id="modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-75 invisible opacity-0">
+        <div class="modal-content transform -translate-y-10 scale-95 max-w-sm w-full bg-gray-800 rounded-2xl shadow-2xl p-6 border border-gray-700">
+            <div class="text-center">
+                <h3 id="modal-title" class="text-2xl font-bold text-red-400">Error</h3>
+                <p id="modal-body" class="mt-4 text-gray-300">Could not complete the action.</p>
+                <button id="modal-close-btn" class="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+                    OK
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 3. JAVASCRIPT LOGIC ---
+
+        // --- Get DOM Elements ---
+        const textBox = document.getElementById('text-box');
+        const summaryBox = document.getElementById('summary-box');
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const summarizeBtn = document.getElementById('summarize-btn');
+        const saveBtn = document.getElementById('save-btn');
+        const statusLabel = document.getElementById('status-label');
+
+        // --- Custom Modal ---
+        const modal = document.getElementById('modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalBody = document.getElementById('modal-body');
+        const modalCloseBtn = document.getElementById('modal-close-btn');
+
+        function showModal(title, message) {
+            modalTitle.textContent = title;
+            modalBody.textContent = message;
+            modal.classList.remove('invisible', 'opacity-0');
+            modal.querySelector('.modal-content').classList.remove('-translate-y-10', 'scale-95');
+        }
+
+        modalCloseBtn.addEventListener('click', () => {
+            modal.classList.add('invisible', 'opacity-0');
+            modal.querySelector('.modal-content').classList.add('-translate-y-10', 'scale-95');
+        });
+
+        // --- Summarizer (Replicates your Python logic) ---
+        function summarize_text(text, maxSentences = 3) {
+            // Split by sentence-ending punctuation
+            const sentences = text.split(/[.!?]/).filter(s => s.trim().length > 0).map(s => s.trim());
+
+            if (sentences.length <= maxSentences) {
+                return text;
+            }
+
+            const summary = [];
+            summary.push(sentences[0]); // First sentence
+            if (sentences.length > 2) {
+                summary.push(sentences[Math.floor(sentences.length / 2)]); // Middle
+            }
+            summary.push(sentences[sentences.length - 1]); // Last sentence
+
+            return summary.join('. ') + '.';
+        }
+        
+        function generateSummary() {
+            // This line reads all content from the input box, regardless of source (typed or voice)
+            const fullText = textBox.value.trim(); 
+            if (!fullText) {
+                showModal("Error", "No text to summarize!");
+                return;
+            }
+            const summary = summarize_text(fullText);
+            summaryBox.value = summary;
+        }
+
+        // --- Save File (Web Version) ---
+        function saveFile() {
+            const fullText = textBox.value.trim();
+            const summary = summaryBox.value.trim();
+
+            if (!fullText && !summary) {
+                showModal("Warning", "There is nothing to save!");
+                return;
+            }
+            
+            const content = `--- FULL TEXT ---\n${fullText}\n\n--- SUMMARY ---\n${summary}`;
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            
+            const timestamp = new Date().toISOString().slice(0, 16).replace(/[-T:]/g, '');
+            a.download = `meeting_${timestamp}.txt`;
+            
+            // Trigger download
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+        }
+
+        // --- Voice Recording (Web Speech API) ---
+        let recognition;
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = true; // Keep listening
+            recognition.interimResults = false; // We only want final results
+            recognition.lang = 'en-US';
+
+            let finalTranscript = '';
+
+            recognition.onstart = () => {
+                statusLabel.textContent = "Status: Recording... (Speak now)";
+                statusLabel.classList.remove('text-yellow-400');
+                statusLabel.classList.add('text-red-400');
+                startBtn.disabled = true;
+                startBtn.classList.add('opacity-50');
+                stopBtn.disabled = false;
+                stopBtn.classList.remove('opacity-50');
+                finalTranscript = textBox.value; // Start from existing text
+            };
+
+            recognition.onresult = (event) => {
+                let interimTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript + '. ';
+                    }
+                }
+                textBox.value = finalTranscript; // Update text box
+                textBox.scrollTop = textBox.scrollHeight; // Auto-scroll
+            };
+
+            recognition.onerror = (event) => {
+                console.error("Speech Recognition Error:", event.error);
+                if (event.error === 'no-speech') {
+                    showModal("Info", "No speech was detected. Please try again.");
+                } else if (event.error === 'audio-capture') {
+                    showModal("Error", "No microphone was found. Please ensure it's connected and enabled.");
+                } else if (event.error === 'not-allowed') {
+                    showModal("Error", "Microphone access was denied. Please allow microphone access in your browser settings.");
+                }
+                stopRecording();
+            };
+
+            recognition.onend = () => {
+                stopRecording();
+            };
+
+        } else {
+            // Browser doesn't support Speech API
+            showModal("Error", "Your browser does not support Speech Recognition. Please use Google Chrome or Microsoft Edge.");
+            startBtn.disabled = true;
+            startBtn.classList.add('opacity-50');
+            startBtn.textContent = "Not Supported";
+        }
+
+        function startRecording() {
+            if (recognition) {
+                try {
+                    textBox.value += ' '; // Add a space
+                    recognition.start();
+                } catch(e) {
+                    console.error("Error starting recognition:", e);
+                    // This can happen if it's already running and gets confused
+                    stopRecording(); // Reset
+                }
+            }
+        }
+
+        function stopRecording() {
+            if (recognition) {
+                recognition.stop();
+            }
+            statusLabel.textContent = "Status: Idle";
+            statusLabel.classList.add('text-yellow-400');
+            statusLabel.classList.remove('text-red-400');
+            startBtn.disabled = false;
+            startBtn.classList.remove('opacity-50');
+            stopBtn.disabled = true;
+            stopBtn.classList.add('opacity-50');
+        }
+
+        // --- Attach Event Listeners ---
+        startBtn.addEventListener('click', startRecording);
+        stopBtn.addEventListener('click', stopRecording);
+        summarizeBtn.addEventListener('click', generateSummary);
+        saveBtn.addEventListener('click', saveFile);
+
+    </script>
+</body>
+</html>
